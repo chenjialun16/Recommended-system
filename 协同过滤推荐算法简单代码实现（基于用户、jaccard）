@@ -1,0 +1,86 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
+
+#协同过滤推荐算法简单代码实现（基于用户、jaccard）
+
+
+# In[2]:
+
+
+import numpy as np
+import pandas as pd
+from pprint import pprint
+
+
+# In[3]:
+
+
+#构建用户购买记录数据集（1买了，0没买）
+users = ["User1","User2","User3","User4","User5",]
+items = ["ItemA","ItemB","ItemC","ItemD","ItemE"]
+datasets = [
+    [1,0,1,1,0],
+    [1,0,0,1,1],
+    [1,0,1,0,0],
+    [0,1,0,1,1],
+    [1,1,1,0,1],
+]
+df = pd.DataFrame(datasets,columns=items,index=users)
+print(df)
+print(df.index)
+print(df.columns)
+
+
+# In[4]:
+
+
+#直接计算某两项的杰卡德相似系数 （两项的交集/两项的并集）
+from sklearn.metrics import jaccard_score
+print(jaccard_score(df['ItemA'],df['ItemB'])) #1/5
+print(jaccard_score(df.loc['User1'],df.loc['User2'])) #2/4
+
+
+# In[5]:
+
+
+#计算所有数据两两之间的杰卡德相似系数
+from sklearn.metrics.pairwise import pairwise_distances
+# 计算用户间相似度(相似度 = 1-杰卡德距离) 默认是行
+user_similar = 1 - pairwise_distances(df.values,metric='jaccard')
+user_similar = pd.DataFrame(user_similar,columns=users,index=users)
+print("用户之间的相似度")
+user_similar
+
+
+# In[6]:
+
+
+#为每个用户找到最相似的K个用户（k=2）
+topN_users = {}
+for i in user_similar.index:
+    _df = user_similar.loc[i].drop(i)#取出第i个用户的那一行，删除自身（自己与自己的相似度为1）
+    _df_sorted = _df.sort_values(ascending = False)  #降序排列
+    top2 = list(_df_sorted.index[:2])#找到前两个
+    topN_users[i] = top2
+    
+print("每个用户最相似的两个用户")
+topN_users
+
+
+# In[8]:
+
+
+rs_users = {}
+for user,sim_users in topN_users.items():
+    rs_user = set()# 每个用户都有一个推荐结果
+    for sim_user in sim_users:#和该用户相似的用户都买过什么，放在一起，set去重
+        rs_user = rs_user.union(set(df.loc[sim_user].replace(0,np.nan).dropna().index))
+        
+    rs_user -= set(df.loc[user].replace(0,np.nan).dropna().index)#除去自己买了的
+    rs_users[user] = rs_user
+print("基于用户推荐")
+rs_users
+
